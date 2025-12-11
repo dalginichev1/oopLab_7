@@ -1,13 +1,14 @@
 #pragma once
 
-#include <set>
-#include <memory>
-#include <queue>
-#include <thread>
-#include <mutex>
 #include <atomic>
-#include <shared_mutex>
 #include <condition_variable>
+#include <memory>
+#include <mutex>
+#include <queue>
+#include <set>
+#include <shared_mutex>
+#include <thread>
+
 #include "npc.hpp"
 
 struct World {
@@ -30,7 +31,7 @@ struct World {
     void print_survivors() const;
     size_t alive_count() const;
 
-private:
+  private:
     set_t npcs;
     mutable std::shared_mutex npcs_mutex;
 

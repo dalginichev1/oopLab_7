@@ -12,13 +12,13 @@ World::World() {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::uniform_int_distribution<> type_dist(1, 3);
-    std::uniform_int_distribution<> coord_dist(0, 99);
+    std::uniform_int_distribution<> coord_dist(0, MAP_WIDTH - 1);
 
     for (int i = 0; i < 50; ++i) {
         NpcType type = static_cast<NpcType>(type_dist(gen));
         int x = coord_dist(gen);
         int y = coord_dist(gen);
-        auto npc = NPCFactory::create(type, x, y);
+        auto npc = create(type, x, y);
         if (npc)
             add(npc);
     }
@@ -40,6 +40,8 @@ void World::remove(const std::shared_ptr<NPC>& npc) {
 
 void World::start() {
     stop_requested = false;
+
+    system("clear");
 
     movement_thread = std::thread(&World::movement_worker, this);
     battle_thread = std::thread(&World::battle_worker, this);
@@ -123,22 +125,36 @@ void World::battle_worker() {
         if (!attacker || !defender || !attacker->is_alive() || !defender->is_alive())
             continue;
 
-        bool attacker_wins = defender->accept(attacker);
-        if (attacker_wins) {
-            defender->kill();
+        try {
+            auto visitor = create_visitors(attacker);
+            if (!visitor)
+                continue;
+
+            bool attacker_wins = defender->accept(*visitor);
+            if (attacker_wins) {
+                defender->kill();
+                remove(defender);
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Ошибка битвы: " << e.what() << std::endl;
         }
     }
 }
 
 void World::display_worker() {
     auto start = std::chrono::steady_clock::now();
+    auto last_update = start;
 
     while (!stop_requested) {
-        std::this_thread::sleep_for(std::chrono::seconds(2));
+        auto now = std::chrono::steady_clock::now();
+        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - start).count();
 
-        auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(
-                           std::chrono::steady_clock::now() - start)
-                           .count();
+        auto time_since_update =
+            std::chrono::duration_cast<std::chrono::milliseconds>(now - last_update);
+        if (time_since_update.count() >= 1000) {
+            last_update = now;
+            print_map();
+        }
 
         if (elapsed >= GAME_DURATION_SEC) {
             stop_requested = true;
@@ -146,8 +162,7 @@ void World::display_worker() {
             break;
         }
 
-        print_map();
-        std::cout << "Времени прошло: " << elapsed << " сек. Живых: " << alive_count() << "\n\n";
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
     }
 
     print_survivors();
@@ -155,12 +170,14 @@ void World::display_worker() {
 
 void World::print_map() const {
     std::lock_guard<std::mutex> lock(cout_mutex);
-    system("clear"); // для Linux/macOS, на Windows: system("cls");
 
+    system("clear");
+
+    // Рисуем карту
     for (int y = 0; y < MAP_HEIGHT; ++y) {
         for (int x = 0; x < MAP_WIDTH; ++x) {
             char c = '.';
-            std::shared_lock<std::shared_mutex> lock(npcs_mutex);
+            std::shared_lock<std::shared_mutex> npc_lock(npcs_mutex);
             for (const auto& npc : npcs) {
                 if (npc->is_alive() && npc->x == x && npc->y == y) {
                     if (npc->type == NpcType::OrcType)
@@ -176,11 +193,16 @@ void World::print_map() const {
         }
         std::cout << '\n';
     }
+
     std::cout << std::flush;
 }
 
 void World::print_survivors() const {
     std::lock_guard<std::mutex> lock(cout_mutex);
+
+    // Перемещаем курсор под карту
+    std::cout << "\033[" << (MAP_HEIGHT + 2) << ";1H";
+
     std::cout << "\n=== ИГРА ОКОНЧЕНА ===\n";
     std::cout << "Выжившие:\n";
     size_t count = 0;
@@ -193,6 +215,7 @@ void World::print_survivors() const {
         }
     }
     std::cout << "Всего выживших: " << count << "\n\n";
+    std::cout << std::flush;
 }
 
 size_t World::alive_count() const {

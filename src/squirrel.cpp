@@ -1,7 +1,6 @@
 #include "squirrel.hpp"
 
-#include "bear.hpp"
-#include "orc.hpp"
+#include "BattleVisitor.hpp"
 
 Squirrel::Squirrel(int x, int y) : NPC(NpcType::SquirrelType, x, y) {
 }
@@ -12,24 +11,12 @@ Squirrel::Squirrel(std::istream& is) : NPC(NpcType::SquirrelType, 0, 0) {
     y = tmp_y;
 }
 
-bool Squirrel::accept(const std::shared_ptr<NPC>& attacker) {
-    return attacker->visit_squirrel(std::static_pointer_cast<Squirrel>(shared_from_this()));
+bool Squirrel::is_squirrel() const {
+    return true;
 }
 
-bool Squirrel::visit_orc(const std::shared_ptr<Orc>& defender) {
-    bool w = false;
-    fight_notify(defender, w);
-    return w;
-}
-bool Squirrel::visit_bear(const std::shared_ptr<Bear>& defender) {
-    bool w = false;
-    fight_notify(defender, w);
-    return w;
-}
-bool Squirrel::visit_squirrel(const std::shared_ptr<Squirrel>& defender) {
-    bool w = rand() % 2;
-    fight_notify(defender, w);
-    return w;
+bool Squirrel::accept(IVisitor& visitor) {
+    return visitor.visit(*this);
 }
 
 void Squirrel::print() const {

@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 include_directories(include)
 
 add_executable(DND
+    src/BattleVisitor.cpp
     src/observers.cpp
     src/bear.cpp
     src/factory.cpp
