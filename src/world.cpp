@@ -60,6 +60,14 @@ void World::stop() {
         display_thread.join();
 }
 
+int World::roll_dice() const
+{
+    static std::random_device rd;
+    static std::mt19937 gen(rd());
+    static std::uniform_int_distribution<> dice(1, 6);
+    return dice(gen);
+}
+
 void World::movement_worker() {
     while (!stop_requested) {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -126,16 +134,23 @@ void World::battle_worker() {
             continue;
 
         try {
-            auto visitor = create_visitors(attacker);
-            if (!visitor)
-                continue;
+            int attack_power = roll_dice();
+            int defense_power = roll_dice();
 
-            bool attacker_wins = defender->accept(*visitor);
-            if (attacker_wins) {
-                defender->kill();
-                remove(defender);
+            if (attack_power > defense_power) {
+                auto visitor = create_visitors(attacker);
+                if (!visitor)
+                    continue;
+
+                bool attacker_wins = defender->accept(*visitor);
+                if (attacker_wins) {
+                    defender->kill();
+                    remove(defender);
+                }
             }
+            
         } catch (const std::exception& e) {
+            std::lock_guard<std::mutex> cout_lock(cout_mutex);
             std::cerr << "Ошибка битвы: " << e.what() << std::endl;
         }
     }
@@ -173,7 +188,6 @@ void World::print_map() const {
 
     system("clear");
 
-    // Рисуем карту
     for (int y = 0; y < MAP_HEIGHT; ++y) {
         for (int x = 0; x < MAP_WIDTH; ++x) {
             char c = '.';
@@ -200,7 +214,6 @@ void World::print_map() const {
 void World::print_survivors() const {
     std::lock_guard<std::mutex> lock(cout_mutex);
 
-    // Перемещаем курсор под карту
     std::cout << "\033[" << (MAP_HEIGHT + 2) << ";1H";
 
     std::cout << "\n=== ИГРА ОКОНЧЕНА ===\n";

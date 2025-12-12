@@ -50,6 +50,7 @@ struct World {
     void movement_worker();
     void battle_worker();
     void display_worker();
+    int roll_dice() const;
 
     void check_and_queue_battles();
 };
